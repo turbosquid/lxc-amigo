@@ -12,6 +12,7 @@ lxc-amigo is a short ruby script that adds a few helpful commands for use with l
 forwards all traffic into the specified container.
 * `rmvhost` - remove either a single vhost for a container, or all
 vhosts associated with the specified container
+* `top` Show current memory and cpu usage of all containers
 
 **note**: the container name is actually the container host name. If you create the container with lxc, then the 
 host name and the container name will be the same. If you use vagrant-lxc, however, the hostname is set 
@@ -63,6 +64,14 @@ Container should be running (as we need the ip)
     nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
     nginx: configuration file /etc/nginx/nginx.conf test is successful
     
+####Show container resource usage
+Shows rss, private dirty and %cpu (relative to host)
+
+    $ lxc-amigo top
+                                   name          rss       pdirty  cpu%
+                                     foo      348824k      270980k   0.2
+                                    foo2      555144k      416716k   0.7
+
 ##Getting startid with lxc
 
 Fire up an ubuntu 12.04 vm and be sure lxc and tools are installed. `apt-get install lxc`
