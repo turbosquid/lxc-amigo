@@ -119,10 +119,12 @@ server {
       memo[3] += private_dirty(parts[1])
       memo
     end
+  rescue Errno::ENOENT # Process could be gone
+    nil
   end
 
   def top
-    data = Dir.glob(File.join(CONTAINER_DIR, '*')).map{ |path| process_summary(path.split('/').last) }.reject{ |summary| !summary}
+    data = Dir.glob(File.join(CONTAINER_DIR, '*')).map{ |path| process_summary(path.split('/').last) }.compact
     puts "                                    name          rss       pdirty  cpu%"
     data.each do |summary|
       puts "%40s %11dk %11dk %5.1f" % [summary[0], summary[1], summary[3], summary[2]]
