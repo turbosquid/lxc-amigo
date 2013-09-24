@@ -7,7 +7,7 @@ class LxcAmigo
   CONTAINER_DIR = ENV['LXC_CONTAINER_PATH'] || '/var/lib/lxc'
   LEASES = ENV['LXC_LEASES'] || '/var/lib/misc/dnsmasq.leases'
   NGINX_DIR = '/etc/nginx'
-  COMMANDS = %w{ip ssh mkvhost rmvhost}
+  COMMANDS = %w{ip ssh mkvhost rmvhost top}
 
   NGINX_VHOST = <<-eot
 # Created by lxc-amigo -- do not edit
@@ -98,12 +98,45 @@ server {
     end
   end
 
+  def private_dirty(pid)
+    return 0 if pid.to_i == 0
+    File.readlines("/proc/#{pid}/smaps").inject(0) do |memo, line|
+      m = line.match(/\APrivate_Dirty:\s+(\d+).+kB/)
+      if m
+        memo += m[1].to_i
+      end
+      memo
+    end 
+  end
+
+  def process_summary(container)
+    ps_out = `lxc-ps -n #{container} ps ao pid,rss,%cpu`.split("\n")
+    return nil if ps_out.length < 2
+    ps_out.inject([container[0..39],0,0,0]) do |memo, line| 
+      parts = line.split
+      memo[1] += parts[2].to_i
+      memo[2] += parts[3].to_f
+      memo[3] += private_dirty(parts[1])
+      memo
+    end
+  end
+
+  def top
+    data = Dir.glob(File.join(CONTAINER_DIR, '*')).map{ |path| process_summary(path.split('/').last) }.reject{ |summary| !summary}
+    puts "                                    name          rss       pdirty  cpu%"
+    data.each do |summary|
+      puts "%40s %11dk %11dk %5.1f" % [summary[0], summary[1], summary[3], summary[2]]
+    end
+  end
+
   def self.help
     puts <<-eoh
 syntax: lxc-amigo <command> <container> [options]
 commands: help      -- This message
           ip        -- get container ip
           ssh       -- ssh to container
+          top       -- summary container resource usage for all containers (rss, %cpu)
+                       ignores container parameter
           mkvhost   -- set up nginx vhost for container
               -s <servername> (public servername)
               -h <hostname>   (hostname within container)
@@ -117,7 +150,7 @@ eoh
       [ '--server', '-s', GetoptLong::REQUIRED_ARGUMENT ],
       [ '--host', '-h', GetoptLong::REQUIRED_ARGUMENT ]
     )
-    if ARGV.length < 2 || ARGV[0]=='help'
+    if (ARGV.length < 2 && ARGV[0] != 'top') || ARGV[0]=='help'
       self.help
       exit(3)
     end
@@ -133,7 +166,7 @@ eoh
       end
     end
     begin
-      LxcAmigo.new(ARGV[1], options).send(ARGV[0])
+      LxcAmigo.new(ARGV[1] || '', options).send(ARGV[0])
     rescue RuntimeError => e
       puts e.message
     end
