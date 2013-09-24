@@ -1,0 +1,146 @@
+#!/usr/bin/env ruby
+require 'getoptlong'
+require 'erb'
+
+class LxcAmigo
+
+  CONTAINER_DIR = ENV['LXC_CONTAINER_PATH'] || '/var/lib/lxc'
+  LEASES = ENV['LXC_LEASES'] || '/var/lib/misc/dnsmasq.leases'
+  NGINX_DIR = '/etc/nginx'
+  COMMANDS = %w{ip ssh mkvhost rmvhost}
+
+  NGINX_VHOST = <<-eot
+# Created by lxc-amigo -- do not edit
+# lxc-amigo-container: <%=@container%>
+server {
+    server_name <%=@options[:servername]%>;
+
+    location / {
+        proxy_pass http://<%=ip%>:80;
+        proxy_set_header Host '<%=@options[:hostname]%>';
+    }
+}
+  eot
+
+  def initialize(container, options)
+    parts = container.split('@') # Could have ssh user glommed on
+    if parts.length == 2
+      @container = parts[1]
+      @user = parts[0]
+    else
+      @container = parts[0]
+    end
+    @options = options
+  end
+
+  def reload_nginx
+    `nginx -t`
+    raise "nginx failed to verify new configuration. Not reloading." if $?.exitstatus != 0
+    `nginx -s reload`
+  end
+
+  def remove_single_vhost(servername, raise_on_wrong_container = true)
+    site_available = File.join(NGINX_DIR,'sites-available', servername)
+    site_enabled = File.join(NGINX_DIR,'sites-enabled', servername)
+    raise "Site #{servername} not found" unless File.exists?(site_available)
+    if File.read(site_available) =~ /^# lxc-amigo-container: #{@container}$/
+      puts "Removing #{servername}"
+      File.unlink(site_enabled) if File.exists?(site_enabled)
+      File.unlink(site_available)
+    elsif raise_on_wrong_container
+      raise "vhost is not associated with container #{@container}"
+    end
+  end
+
+  def rmvhost
+    if @options[:servername]
+      remove_single_vhost(@options[:servername])
+    else # Remove every vhost associated with this container
+      Dir.glob(File.join(NGINX_DIR,'sites-available/*')).map{ |filename| filename.split('/').last }.each do |site|
+        remove_single_vhost(site, false)
+      end
+    end
+    reload_nginx
+  end
+
+  def mkvhost
+    ip = dig_for_ip
+    raise "container #{@container} does not appear to be running" unless ip
+    raise "No servername provided (-s <servername>)" unless @options[:servername]
+    raise "No hostname provided (-h <hostname>)" unless @options[:hostname]
+    template = ERB.new(NGINX_VHOST, nil, '<>')
+    site_available = File.join(NGINX_DIR,'sites-available', @options[:servername])
+    File.open(site_available, "w") {|f| f.write(template.result(binding)) }
+    site_enabled = File.join(NGINX_DIR,'sites-enabled', @options[:servername])
+    File.symlink(site_available, site_enabled) unless File.exists?(site_enabled)
+    reload_nginx
+  end
+
+  def ip
+    puts "#{dig_for_ip}"
+  end
+
+  def ssh
+    ip = dig_for_ip
+    raise "container #{@container} does not appear to be running" unless ip
+    raise "Unable to lookup ip for container" if ip.empty?
+    if @user
+      exec("ssh #{@user}@#{ip}")
+    else
+      exec("ssh #{ip}")
+    end
+  end
+
+  def dig_for_ip
+    info = File.readlines(LEASES).map {|line| line.split }.detect{ |fields| fields[3] == @container }
+    if info
+      return info[2]
+    end
+  end
+
+  def self.help
+    puts <<-eoh
+syntax: lxc-amigo <command> <container> [options]
+commands: help      -- This message
+          ip        -- get container ip
+          ssh       -- ssh to container
+          mkvhost   -- set up nginx vhost for container
+              -s <servername> (public servername)
+              -h <hostname>   (hostname within container)
+          rmvhost   -- remove nginx vhost for container
+eoh
+  end
+
+  def self.run
+    opts = GetoptLong.new(
+      [ '--user', '-u', GetoptLong::REQUIRED_ARGUMENT ],
+      [ '--server', '-s', GetoptLong::REQUIRED_ARGUMENT ],
+      [ '--host', '-h', GetoptLong::REQUIRED_ARGUMENT ]
+    )
+    if ARGV.length < 2 || ARGV[0]=='help'
+      self.help
+      exit(3)
+    end
+    raise "Unknown command: #{ARGV[0]}" unless LxcAmigo::COMMANDS.include?(ARGV[0])
+    # Set up some variables
+    options = {}
+    opts.each do |opt, arg|
+      case opt
+        when '--host'
+          options[:hostname] = arg
+        when '--server'
+          options[:servername] = arg
+      end
+    end
+    begin
+      LxcAmigo.new(ARGV[1], options).send(ARGV[0])
+    rescue RuntimeError => e
+      puts e.message
+    end
+  end
+end
+
+LxcAmigo.run
+
+
+
