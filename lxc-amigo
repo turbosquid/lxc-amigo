@@ -6,6 +6,7 @@ class LxcAmigo
 
   CONTAINER_DIR = ENV['LXC_CONTAINER_PATH'] || '/var/lib/lxc'
   LEASES = ENV['LXC_LEASES'] || '/var/lib/misc/dnsmasq.leases'
+  LEASE_TEMPLATE =  "/var/lib/misc/dnsmasq.%s.leases"
   NGINX_DIR = '/etc/nginx'
   COMMANDS = %w{ip ssh mkvhost rmvhost top}
 
@@ -30,6 +31,7 @@ server {
     else
       @container = parts[0]
     end
+    @container_config = parse_container_config
     @options = options
   end
 
@@ -92,9 +94,15 @@ server {
   end
 
   def dig_for_ip
-    info = File.readlines(LEASES).map {|line| line.split }.detect{ |fields| fields[3] == @container }
-    if info
-      return info[2]
+    if File.exists?(LEASES)
+      lease_file = LEASES
+    else
+      bridge_name = configuration_value_first('lxc.network.link')
+      lease_file = LEASE_TEMPLATE % bridge_name if bridge_name
+    end
+    if lease_file && File.exists?(lease_file)
+      info = File.readlines(lease_file).map {|line| line.split }.detect{ |fields| fields[3] == @container }
+      info[2] if info
     end
   end
 
@@ -110,7 +118,9 @@ server {
   end
 
   def process_summary(container)
-    ps_out = `lxc-ps -n #{container} ps ao pid,rss,%cpu`.split("\n")
+    ps_out = `lxc-ps -n #{container} ps ao pid,rss,%cpu 2> /dev/null`.split("\n")
+    ps_out =  `lxc-ps -n #{container} ao pid,rss,%cpu`.split("\n") unless $?.success?
+
     return nil if ps_out.length < 2
     ps_out.inject([container[0..39],0,0,0]) do |memo, line| 
       parts = line.split
@@ -130,6 +140,44 @@ server {
       puts "%40s %11dk %11dk %5.1f" % [summary[0], summary[1], summary[3], summary[2]]
     end
   end
+
+  def container_config
+    if @container
+      File.join(CONTAINER_DIR, @container,'config')
+    end
+  end
+
+  def container_exists?
+    if container_config
+      File.exists? container_config
+    end
+  end
+
+  def parse_container_config
+    if container_exists?
+      parse_kv_data(File.read(container_config))
+    end
+  end
+
+  def configuration_value_first(key)
+    if @container_config && @container_config[key]
+      @container_config[key].first
+    end
+  end
+
+  def parse_kv_data(data)
+    res = {}
+    data.split("\n").reject{ |line| line[0] == '#' || line.strip.empty?}.each do |line|
+    k, v = line.split('=')
+      key = k.strip
+      if v
+        res[key] ||= []
+        res[key] << v.strip
+      end
+    end
+    res
+  end
+
 
   def self.help
     puts <<-eoh
