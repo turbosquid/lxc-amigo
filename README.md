@@ -1,6 +1,6 @@
 lxc-amigo
 ======
-
+*Now with 30% fewer NSA back doors!*
 
 lxc-amigo is a short ruby script that adds a few helpful commands for use with lxc containers:
 
