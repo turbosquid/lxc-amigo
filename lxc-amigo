@@ -98,8 +98,13 @@ server {
       lease_file = LEASES
     else
       bridge_name = configuration_value_first('lxc.network.link')
-      lease_file = LEASE_TEMPLATE % bridge_name if bridge_name
+      if bridge_name
+        lease_file = LEASE_TEMPLATE % bridge_name
+      else
+        lease_file = Dir.glob(LEASE_TEMPLATE % '*').first
+      end
     end
+    p lease_file
     if lease_file && File.exists?(lease_file)
       info = File.readlines(lease_file).map {|line| line.split }.detect{ |fields| fields[3] == @container }
       info[2] if info
