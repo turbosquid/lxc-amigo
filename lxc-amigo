@@ -193,7 +193,7 @@ commands: help      -- This message
                        ignores container parameter
           mkvhost   -- set up nginx vhost for container
               -s <servername> (public servername)
-              -h <hostname>   (hostname within container)
+              -h <hostname>   (hostname passed to container. defaults to <servername>)
           rmvhost   -- remove nginx vhost for container
 eoh
   end
@@ -222,6 +222,7 @@ eoh
            options[:port] = arg
       end
     end
+    options[:hostname] = options[:servername] unless options[:hostname]
     begin
       LxcAmigo.new(ARGV[1] || '', options).send(ARGV[0])
     rescue RuntimeError => e
