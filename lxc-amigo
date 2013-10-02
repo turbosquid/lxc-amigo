@@ -17,7 +17,7 @@ server {
     server_name <%=@options[:servername]%>;
 
     location / {
-        proxy_pass http://<%=ip%>:80;
+        proxy_pass http://<%=ip%>:<%=@options[:port]%>;
         proxy_set_header Host '<%=@options[:hostname]%>';
     }
 }
@@ -202,7 +202,8 @@ eoh
     opts = GetoptLong.new(
       [ '--user', '-u', GetoptLong::REQUIRED_ARGUMENT ],
       [ '--server', '-s', GetoptLong::REQUIRED_ARGUMENT ],
-      [ '--host', '-h', GetoptLong::REQUIRED_ARGUMENT ]
+      [ '--host', '-h', GetoptLong::REQUIRED_ARGUMENT ],
+      [ '--port', '-p', GetoptLong::REQUIRED_ARGUMENT ]     
     )
     if (ARGV.length < 2 && ARGV[0] != 'top') || ARGV[0]=='help'
       self.help
@@ -217,9 +218,12 @@ eoh
           options[:hostname] = arg
         when '--server'
           options[:servername] = arg
+         when '--port'
+           options[:port] = arg
       end
     end
     options[:hostname] = options[:servername] unless options[:hostname]
+    options[:port] = 80 unless options[:port]
     begin
       LxcAmigo.new(ARGV[1] || '', options).send(ARGV[0])
     rescue RuntimeError => e
