@@ -222,8 +222,8 @@ eoh
            options[:port] = arg
       end
     end
-    options[:hostname] = options[:servername] unless options[:hostname]
-    options[:port] = 80 unless options[:port]
+    options[:hostname] ||= options[:servername]
+    options[:port] ||= 80 
     begin
       LxcAmigo.new(ARGV[1] || '', options).send(ARGV[0])
     rescue RuntimeError => e
