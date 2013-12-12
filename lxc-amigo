@@ -208,6 +208,7 @@ server {
 
   def self.help
     puts <<-eoh
+lxc-amigo (0.1.0)
 syntax: lxc-amigo <command> <container> [options]
 commands: help      -- This message
           ip        -- get container ip
@@ -217,7 +218,11 @@ commands: help      -- This message
           mkvhost   -- set up nginx vhost for container
               -s <servername> (public servername)
               -h <hostname>   (hostname passed to container. defaults to <servername>)
+              -p <portnum>    (port to proxy. Defaults to 80)
+              envars
+                  RAILS_ASSETS=/path/to/rails/public (inside container). Totally optional
           rmvhost   -- remove nginx vhost for container
+          path      -- container rootfs path on host
 eoh
   end
 
