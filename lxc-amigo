@@ -220,7 +220,7 @@ commands: help      -- This message
               -h <hostname>   (hostname passed to container. defaults to <servername>)
               -p <portnum>    (port to proxy. Defaults to 80)
               envars
-                  RAILS_ASSETS=/path/to/rails/public (inside container). Totally optional
+                  RAILS_ASSET_PATH=/path/to/rails/public (inside container). Totally optional
           rmvhost   -- remove nginx vhost for container
           path      -- container rootfs path on host
 eoh
