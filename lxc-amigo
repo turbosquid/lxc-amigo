@@ -20,9 +20,9 @@ server {
         proxy_pass http://<%=ip%>:<%=@options[:port]%>;
         proxy_set_header Host '<%=@options[:hostname]%>';
     }
-    <% if ENV['RAILS_ASSET_DIR'] %>
+    <% if @options[:asset_path] %>
     location ~ ^/(assets)/  {
-        root <%=File.join(container_root_path, "#{ENV['RAILS_ASSET_DIR']}") %>;
+        root <%=File.join(container_root_path, @options[:asset_path]) %>;
         gzip_static on;
         expires     max;
         add_header  Cache-Control public;
@@ -219,8 +219,7 @@ commands: help      -- This message
               -s <servername> (public servername)
               -h <hostname>   (hostname passed to container. defaults to <servername>)
               -p <portnum>    (port to proxy. Defaults to 80)
-              envars
-                  RAILS_ASSET_PATH=/path/to/rails/public (inside container). Totally optional
+              --asset-path </path/to/rails/public> (inside container). Totally optional)
           rmvhost   -- remove nginx vhost for container
           path      -- container rootfs path on host
 eoh
@@ -231,7 +230,8 @@ eoh
       [ '--user', '-u', GetoptLong::REQUIRED_ARGUMENT ],
       [ '--server', '-s', GetoptLong::REQUIRED_ARGUMENT ],
       [ '--host', '-h', GetoptLong::REQUIRED_ARGUMENT ],
-      [ '--port', '-p', GetoptLong::REQUIRED_ARGUMENT ]     
+      [ '--port', '-p', GetoptLong::REQUIRED_ARGUMENT ],
+      [ '--asset-path', GetoptLong::REQUIRED_ARGUMENT ]     
     )
     if (ARGV.length < 2 && ARGV[0] != 'top') || ARGV[0]=='help'
       self.help
@@ -248,6 +248,8 @@ eoh
           options[:servername] = arg
          when '--port'
            options[:port] = arg
+         when '--asset-path'
+           options[:asset_path] = arg
       end
     end
     options[:hostname] ||= options[:servername]
