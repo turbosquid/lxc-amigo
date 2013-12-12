@@ -43,6 +43,8 @@ Container should be running (as we need the ip)
 
 + -h (--host) is passed in the http Host: header to the container    
 
++ -p (--port) is port the server is running on in the container
+
 ```    
     $ lxc-amigo mkvhost foo -s container-3.example.com -h internal-server.example.com
     nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
