@@ -8,7 +8,7 @@ class LxcAmigo
   LEASES = ENV['LXC_LEASES'] || '/var/lib/misc/dnsmasq.leases'
   LEASE_TEMPLATE =  "/var/lib/misc/dnsmasq.%s.leases"
   NGINX_DIR = '/etc/nginx'
-  COMMANDS = %w{ip ssh mkvhost rmvhost top}
+  COMMANDS = %w{ip ssh mkvhost rmvhost top path}
 
   NGINX_VHOST = <<-eot
 # Created by lxc-amigo -- do not edit
@@ -20,6 +20,14 @@ server {
         proxy_pass http://<%=ip%>:80;
         proxy_set_header Host '<%=@options[:hostname]%>';
     }
+    <% if ENV['RAILS_ASSET_DIR'] %>
+    location ~ ^/(assets)/  {
+        root <%=File.join(container_root_path, "#{ENV['RAILS_ASSET_DIR']}") %>;
+        gzip_static on;
+        expires     max;
+        add_header  Cache-Control public;
+    }
+    <% end %>
 }
   eot
 
@@ -94,20 +102,35 @@ server {
   end
 
   def dig_for_ip
-    if File.exists?(LEASES)
-      lease_file = LEASES
-    else
-      bridge_name = configuration_value_first('lxc.network.link')
-      if bridge_name
-        lease_file = LEASE_TEMPLATE % bridge_name
-      else
-        lease_file = Dir.glob(LEASE_TEMPLATE % '*').first
+    ip = `dig @10.0.3.1 #{@container} +short`.strip
+    ip unless ip.empty?
+  end
+
+  # Look this up by the container host ip. Container must be running
+  def container_lxc_name
+    @container_lxc_name ||= begin
+      ip = dig_for_ip
+      if ip
+        match = `lxc-ls --fancy`.match(/\n(.+?)  +RUNNING +#{ip}/)
+        @container_lxc_name = match[1] if match
       end
     end
-    if lease_file && File.exists?(lease_file)
-      info = File.readlines(lease_file).map {|line| line.split }.detect{ |fields| fields[3] == @container }
-      info[2] if info
+  end
+
+  def container_path
+    @container_path ||= begin
+      if container_lxc_name
+        File.join(CONTAINER_DIR, container_lxc_name)
+      end
     end
+  end
+
+  def container_root_path
+    File.join(container_path, "rootfs") if container_path
+  end
+
+  def path
+    puts container_root_path
   end
 
   def private_dirty(pid)
