@@ -147,8 +147,8 @@ server {
   def process_summary(container)
     ps_out = `lxc-ps -n #{container} ps ao pid,rss,%cpu 2> /dev/null`.split("\n")
     ps_out =  `lxc-ps -n #{container} ao pid,rss,%cpu`.split("\n") unless $?.success?
-
     return nil if ps_out.length < 2
+
     ps_out.inject([container[0..39],0,0,0]) do |memo, line| 
       parts = line.split
       memo[1] += parts[2].to_i
