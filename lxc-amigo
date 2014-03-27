@@ -213,7 +213,7 @@ server {
 
   def self.help
     puts <<-eoh
-lxc-amigo (0.1.0)
+lxc-amigo (0.2.0)
 syntax: lxc-amigo <command> <container> [options]
 commands: help      -- This message
           ip        -- get container ip
