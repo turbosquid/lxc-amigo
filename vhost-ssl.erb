@@ -1,0 +1,21 @@
+# TEST Container Yo!
+# lxc-amigo-container: <%=@container%>
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name <%=@options[:servername]%>;
+
+    location / {
+        proxy_pass http://<%=ip%>:<%=@options[:port]%>;
+        proxy_set_header Host '<%=@options[:hostname]%>';
+    }
+    <% if @options[:asset_path] %>
+    location ~ ^/(assets)/  {
+        root <%=File.join(container_root_path, @options[:asset_path]) %>;
+        gzip_static on;
+        expires     max;
+        add_header  Cache-Control public;
+    }
+    <% end %>
+}
+
