@@ -78,7 +78,12 @@ server {
     raise "container #{@container} does not appear to be running" unless ip
     raise "No servername provided (-s <servername>)" unless @options[:servername]
     raise "No hostname provided (-h <hostname>)" unless @options[:hostname]
-    template = ERB.new(NGINX_VHOST, nil, '<>')
+    nginx_vhost = NGINX_VHOST
+    if @options[:template]
+      raise "Template file #{@options[:template]} not found" unless File.exists?(@options[:template])
+      nginx_vhost = File.read(@options[:template])
+    end
+    template = ERB.new(nginx_vhost, nil, '<>')
     site_available = File.join(NGINX_DIR,'sites-available', @options[:servername])
     File.open(site_available, "w") {|f| f.write(template.result(binding)) }
     site_enabled = File.join(NGINX_DIR,'sites-enabled', @options[:servername])
@@ -145,15 +150,15 @@ server {
   end
 
   def process_summary(container)
-    ps_out = `lxc-ps -n #{container} ps ao pid,rss,%cpu 2> /dev/null`.split("\n")
-    ps_out =  `lxc-ps -n #{container} ao pid,rss,%cpu`.split("\n") unless $?.success?
-    return nil if ps_out.length < 2
-
-    ps_out.inject([container[0..39],0,0,0]) do |memo, line| 
+    tasks_file = "/sys/fs/cgroup/cpu/#{container}/tasks"
+    return nil unless File.exists?(tasks_file)
+    pids = File.read(tasks_file).split("\n")
+    ps_data =  `ps -p #{pids.join(",")} o pid="",rss="",%cpu=""`.split("\n")
+    ps_data.inject([container[0..39],0,0,0]) do |memo, line| 
       parts = line.split
-      memo[1] += parts[2].to_i
-      memo[2] += parts[3].to_f
-      memo[3] += private_dirty(parts[1])
+      memo[1] += parts[1].to_i
+      memo[2] += parts[2].to_f
+      memo[3] += private_dirty(parts[0])
       memo
     end
   rescue Errno::ENOENT # Process could be gone
@@ -219,6 +224,7 @@ commands: help      -- This message
               -s <servername> (public servername)
               -h <hostname>   (hostname passed to container. defaults to <servername>)
               -p <portnum>    (port to proxy. Defaults to 80)
+              -t <template>   (path to vhost template ERB file. Optional)
               --asset-path </path/to/rails/public> (inside container). Totally optional)
           rmvhost   -- remove nginx vhost for container
           path      -- container rootfs path on host
@@ -231,7 +237,8 @@ eoh
       [ '--server', '-s', GetoptLong::REQUIRED_ARGUMENT ],
       [ '--host', '-h', GetoptLong::REQUIRED_ARGUMENT ],
       [ '--port', '-p', GetoptLong::REQUIRED_ARGUMENT ],
-      [ '--asset-path', GetoptLong::REQUIRED_ARGUMENT ]     
+      [ '--asset-path', GetoptLong::REQUIRED_ARGUMENT ],
+      [ '--template', '-t',  GetoptLong::REQUIRED_ARGUMENT ],
     )
     if (ARGV.length < 2 && ARGV[0] != 'top') || ARGV[0]=='help'
       self.help
@@ -250,6 +257,8 @@ eoh
            options[:port] = arg
          when '--asset-path'
            options[:asset_path] = arg
+         when '--template'
+           options[:template] = arg
       end
     end
     options[:hostname] ||= options[:servername]
