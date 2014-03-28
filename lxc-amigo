@@ -8,6 +8,7 @@ class LxcAmigo
   LEASES = ENV['LXC_LEASES'] || '/var/lib/misc/dnsmasq.leases'
   LEASE_TEMPLATE =  "/var/lib/misc/dnsmasq.%s.leases"
   NGINX_DIR = '/etc/nginx'
+  VHOST_TEMPLATE_FILE = "/etc/lxc-amigo.d/vhost.conf.erb"
   COMMANDS = %w{ip ssh mkvhost rmvhost top path}
 
   NGINX_VHOST = <<-eot
@@ -82,6 +83,8 @@ server {
     if @options[:template]
       raise "Template file #{@options[:template]} not found" unless File.exists?(@options[:template])
       nginx_vhost = File.read(@options[:template])
+    elsif File.exists?(VHOST_TEMPLATE_FILE)
+      nginx_vhost = File.read(VHOST_TEMPLATE_FILE)
     end
     template = ERB.new(nginx_vhost, nil, '<>')
     site_available = File.join(NGINX_DIR,'sites-available', @options[:servername])
