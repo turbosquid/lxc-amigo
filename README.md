@@ -52,6 +52,7 @@ Container should be running (as we need the ip)
     nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
     nginx: configuration file /etc/nginx/nginx.conf test is successful
 ```
+You can also drop an erb file into `/etc/lxc-amigo.d/vhost.conf.erb`
 
 ####Remove a single vhost
     
