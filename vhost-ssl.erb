@@ -5,7 +5,13 @@ server {
     listen 443 ssl;
     server_name <%=@options[:servername]%>;
 
+    <% if @options[:asset_path] %>
     location / {
+      root <%=File.join(container_root_path, @options[:asset_path]) %>;
+      try_files $uri @rails;
+    }
+    <% end %>
+    location @rails {
         proxy_pass http://<%=ip%>:<%=@options[:port]%>;
         proxy_set_header Host '<%=@options[:hostname]%>';
     }
