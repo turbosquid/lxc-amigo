@@ -17,6 +17,8 @@ server {
     <% else %>
     location / {
     <% end %>
+     	  proxy_set_header X-Forwarded-Proto $scheme;
+	      proxy_redirect off;
         proxy_pass http://<%=ip%>:<%=@options[:port]%>;
         proxy_set_header Host '<%=@options[:hostname]%>';
     }
