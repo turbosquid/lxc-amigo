@@ -119,7 +119,7 @@ server {
     @container_lxc_name ||= begin
       ip = dig_for_ip
       if ip
-        match = `lxc-ls --fancy`.match(/\n(.+?)  +RUNNING +#{ip}/)
+        match = `lxc-ls --fancy`.match(/\n(.+?)  +RUNNING +#{ip} /)
         @container_lxc_name = match[1] if match
       end
     end
